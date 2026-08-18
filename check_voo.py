@@ -1,51 +1,69 @@
+import datetime
 import os
-import sys
+import requests
+import numpy as np
+import yfinance as yf
 
-print("[1/9] Starting script execution...", flush=True)
+# --- Configuration & Setup ---
+DISCORD_WEBHOOK_URL = "YOUR_DISCORD_WEBHOOK_URL"
+STATE_FILE = "last_trigger.txt"
+SYMBOL = "VOO"
 
-try:
-    print("[2/9] Importing requests...", flush=True)
-    import requests
+# Fetch 1 year of daily historical data
+ticker = yf.Ticker(SYMBOL)
+df = ticker.history(period="1y")
+
+# Extract price series
+prices_1y = df["Close"].values
+prices_6m = prices_1y[-126:]  # ~6 months
+prices_3m = prices_1y[-63:]   # ~3 months
+prices_1m = prices_1y[-21:]   # ~1 month (21 trading days)
+
+current_price = prices_1y[-1]
+
+# --- High / Low Calculations ---
+high_1m, low_1m = float(np.max(prices_1m)), float(np.min(prices_1m))
+high_3m, low_3m = float(np.max(prices_3m)), float(np.min(prices_3m))
+high_6m, low_6m = float(np.max(prices_6m)), float(np.min(prices_6m))
+high_1y, low_1y = float(np.max(prices_1y)), float(np.min(prices_1y))
+
+# --- Percentile Calculations ---
+p5_1m = np.percentile(prices_1m, 5)
+
+# Calculate where current price falls on 0% (month low) to 100% (month high) scale
+if high_1m == low_1m:
+    price_percentile_1m = 100.0
+else:
+    price_percentile_1m = ((current_price - low_1m) / (high_1m - low_1m)) * 100
+
+# --- Cooldown Check (Prevents triggering twice in 2 days) ---
+def can_trigger():
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r") as f:
+            last_date_str = f.read().strip()
+            if last_date_str:
+                last_date = datetime.datetime.strptime(last_date_str, "%Y-%m-%d").date()
+                if (datetime.date.today() - last_date).days < 2:
+                    return False
+    return True
+
+# --- Trigger Condition & Execution ---
+# Note: Retained 'True' override for testing as requested
+if True: # (current_price <= p5_1m) and can_trigger():
+    message = (
+        f"**{SYMBOL} Price Alert**\n"
+        f"• **Current Price:** ${current_price:.2f}\n"
+        f"• **1-Month Relative Position:** {price_percentile_1m:.1f}%\n\n"
+        f"**Range Metrics:**\n"
+        f"• **1-Month:** Low: ${low_1m:.2f} | High: ${high_1m:.2f}\n"
+        f"• **3-Month:** Low: ${low_3m:.2f} | High: ${high_3m:.2f}\n"
+        f"• **6-Month:** Low: ${low_6m:.2f} | High: ${high_6m:.2f}\n"
+        f"• **1-Year:** Low: ${low_1y:.2f} | High: ${high_1y:.2f}"
+    )
+
+    response = requests.post(DISCORD_WEBHOOK_URL, json={"content": message})
     
-    print("[3/9] Importing yfinance...", flush=True)
-    import yfinance as yf
-
-    print("[4/9] Fetching VOO daily historical data from yfinance...", flush=True)
-    df = yf.download("VOO", period="1mo", interval="1d", multi_level_index=False)
-    print(f"      DataFrame successfully fetched. Shape: {df.shape}", flush=True)
-
-    print("[5/9] Calculating previous 20-trading-day low...", flush=True)
-    previous_4_week_low = float(df["Close"].iloc[-21:-1].min())
-    print(f"      4-Week Low calculated: {previous_4_week_low:.2f}", flush=True)
-
-    print("[6/9] Extracting latest close price...", flush=True)
-    current_price = float(df["Close"].iloc[-1])
-    print(f"      Current Price extracted: {current_price:.2f}", flush=True)
-
-    print("[7/9] Fetching DISCORD_WEBHOOK_URL from environment...", flush=True)
-    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
-    if webhook_url:
-        print("      Webhook URL found in environment.", flush=True)
-    else:
-        print("      WARNING: Webhook URL is missing or empty!", flush=True)
-
-    print("[8/9] Building payload message...", flush=True)
-    message = {
-        "content": f"🚨 **VOO 4-Week Low Alert!** 🚨\nCurrent Price: **${current_price:.2f}** (Previous 4-Week Low: ${previous_4_week_low:.2f})"
-    }
-
-    print("[9/9] Checking trigger condition...", flush=True)
-    # Temporarily set to True for testing
-    if True:
-        print("      Condition met. Sending POST request to Discord...", flush=True)
-        res = requests.post(webhook_url, json=message)
-        print(f"      Discord HTTP Response Status Code: {res.status_code}", flush=True)
-        print(f"      Discord Response Text: {res.text}", flush=True)
-    else:
-        print("      Condition not met. Skipping alert.", flush=True)
-
-    print("Script finished successfully!", flush=True)
-
-except Exception as e:
-    print(f"\n❌ SCRIPT FAILED WITH ERROR:\n{e}", flush=True)
-    sys.exit(1)
+    if response.status_code in [200, 204]:
+        with open(STATE_FILE, "w") as f:
+            f.write(str(datetime.date.today()))
+        print("Alert sent successfully.")
