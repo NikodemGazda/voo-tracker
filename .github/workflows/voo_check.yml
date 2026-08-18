@@ -1,0 +1,21 @@
+name: Hourly VOO 4-Week Low Check
+
+on:
+  schedule:
+    # Runs at :30 every hour from 9:30 AM to 3:30 PM Eastern Time, Mon-Fri
+    - cron: '30 9-15 * * 1-5'
+      timezone: 'America/New_York'
+  workflow_dispatch: # Allows manual run for testing
+
+jobs:
+  check-voo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - run: pip install yfinance requests
+      - run: python check_voo.py
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
