@@ -31,7 +31,7 @@ high_6m, low_6m = float(np.max(prices_6m)), float(np.min(prices_6m))
 high_1y, low_1y = float(np.max(prices_1y)), float(np.min(prices_1y))
 
 # --- Percentile Calculations ---
-p5_1m = np.percentile(prices_1m, 5)
+p10_1m = np.percentile(prices_1m, 10)
 
 # Calculate where current price falls on 0% (month low) to 100% (month high) scale
 if high_1m == low_1m:
@@ -51,8 +51,7 @@ def can_trigger():
     return True
 
 # --- Trigger Condition & Execution ---
-# Note: Retained 'True' override for testing as requested
-if True: # (current_price <= p5_1m) and can_trigger():
+if (current_price <= p10_1m) and can_trigger():
     message = (
         f"**{SYMBOL} Price Alert**\n"
         f"• **Current Price:** ${current_price:.2f}\n"
@@ -72,3 +71,5 @@ if True: # (current_price <= p5_1m) and can_trigger():
         print("Alert sent successfully.")
     else:
         print(f"Failed to send alert. HTTP Status: {response.status_code}, Response: {response.text}")
+else:
+    print("Conditions not met or cooldown active. No alert sent.")
