@@ -5,9 +5,12 @@ import numpy as np
 import yfinance as yf
 
 # --- Configuration & Setup ---
-DISCORD_WEBHOOK_URL = "YOUR_DISCORD_WEBHOOK_URL"
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 STATE_FILE = "last_trigger.txt"
 SYMBOL = "VOO"
+
+if not DISCORD_WEBHOOK_URL:
+    raise ValueError("DISCORD_WEBHOOK_URL environment variable is not set.")
 
 # Fetch 1 year of daily historical data
 ticker = yf.Ticker(SYMBOL)
@@ -67,3 +70,5 @@ if True: # (current_price <= p5_1m) and can_trigger():
         with open(STATE_FILE, "w") as f:
             f.write(str(datetime.date.today()))
         print("Alert sent successfully.")
+    else:
+        print(f"Failed to send alert. HTTP Status: {response.status_code}, Response: {response.text}")
