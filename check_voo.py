@@ -1,30 +1,51 @@
 import os
-import requests
-import yfinance as yf
+import sys
 
-# Force multi_level_index=False to ensure single-level column headers
-df = yf.download("VOO", period="1mo", interval="1d", multi_level_index=False)
+print("[1/9] Starting script execution...", flush=True)
 
-# Get the prior 20-trading-day low (excluding current active day)
-previous_4_week_low = float(df["Close"].iloc[-21:-1].min())
+try:
+    print("[2/9] Importing requests...", flush=True)
+    import requests
+    
+    print("[3/9] Importing yfinance...", flush=True)
+    import yfinance as yf
 
-# Fetch real-time price
-ticker = yf.Ticker("VOO")
-current_price = float(ticker.fast_info["last_price"])
+    print("[4/9] Fetching VOO daily historical data from yfinance...", flush=True)
+    df = yf.download("VOO", period="1mo", interval="1d", multi_level_index=False)
+    print(f"      DataFrame successfully fetched. Shape: {df.shape}", flush=True)
 
-print(f"Current Price: {current_price}")
-print(f"4-Week Low: {previous_4_week_low}")
+    print("[5/9] Calculating previous 20-trading-day low...", flush=True)
+    previous_4_week_low = float(df["Close"].iloc[-21:-1].min())
+    print(f"      4-Week Low calculated: {previous_4_week_low:.2f}", flush=True)
 
-webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
+    print("[6/9] Extracting latest close price...", flush=True)
+    current_price = float(df["Close"].iloc[-1])
+    print(f"      Current Price extracted: {current_price:.2f}", flush=True)
 
-message = {
-    "content": f"🚨 **VOO 4-Week Low Alert!** 🚨\nCurrent Price: **${current_price:.2f}** (Previous 4-Week Low: ${previous_4_week_low:.2f})"
-}
-
-# Force trigger for testing
-if True:
+    print("[7/9] Fetching DISCORD_WEBHOOK_URL from environment...", flush=True)
+    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
     if webhook_url:
-        res = requests.post(webhook_url, json=message)
-        print(f"Discord Response Status: {res.status_code}")
+        print("      Webhook URL found in environment.", flush=True)
     else:
-        print("Webhook URL missing.")
+        print("      WARNING: Webhook URL is missing or empty!", flush=True)
+
+    print("[8/9] Building payload message...", flush=True)
+    message = {
+        "content": f"🚨 **VOO 4-Week Low Alert!** 🚨\nCurrent Price: **${current_price:.2f}** (Previous 4-Week Low: ${previous_4_week_low:.2f})"
+    }
+
+    print("[9/9] Checking trigger condition...", flush=True)
+    # Temporarily set to True for testing
+    if True:
+        print("      Condition met. Sending POST request to Discord...", flush=True)
+        res = requests.post(webhook_url, json=message)
+        print(f"      Discord HTTP Response Status Code: {res.status_code}", flush=True)
+        print(f"      Discord Response Text: {res.text}", flush=True)
+    else:
+        print("      Condition not met. Skipping alert.", flush=True)
+
+    print("Script finished successfully!", flush=True)
+
+except Exception as e:
+    print(f"\n❌ SCRIPT FAILED WITH ERROR:\n{e}", flush=True)
+    sys.exit(1)
