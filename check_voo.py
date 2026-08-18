@@ -16,7 +16,8 @@ ticker = yf.Ticker("VOO")
 current_price = float(ticker.fast_info["last_price"])
 
 # Trigger alert if current price hits or breaks the 4-week low
-if current_price <= previous_4_week_low:
+# if current_price <= previous_4_week_low:
+if True:
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
     message = {
         "content": f"🚨 **VOO 4-Week Low Alert!** 🚨\nCurrent Price: **${current_price:.2f}** (Previous 4-Week Low: ${previous_4_week_low:.2f})"
